@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Eurovision 2026 — Prediction Game</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --esc-gold: #D4AF37;
+    --esc-deep: #0B0E2D;
+    --esc-mid: #141840;
+    --esc-surface: #1C2154;
+    --esc-glow: #6C63FF;
+    --esc-pink: #FF6B9D;
+    --esc-cyan: #00D4FF;
+    --esc-lime: #A8FF00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--esc-deep);
+    color: #E8E6F0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(108,99,255,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 90%, rgba(255,107,157,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 30% at 50% 50%, rgba(0,212,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .app-wrap { position: relative; z-index: 1; }
+
+  .sortable-ghost {
+    opacity: 0.35;
+    border: 2px dashed var(--esc-glow) !important;
+    border-radius: 10px;
+  }
+  .sortable-chosen {
+    box-shadow: 0 0 24px rgba(108,99,255,0.5), 0 8px 32px rgba(0,0,0,0.4) !important;
+    transform: scale(1.04);
+    z-index: 999;
+  }
+  .sortable-drag { opacity: 0.95 !important; }
+
+  .country-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--esc-surface);
+    border: 1px solid rgba(108,99,255,0.15);
+    border-radius: 10px;
+    cursor: grab;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  .country-card:hover {
+    border-color: rgba(108,99,255,0.4);
+    box-shadow: 0 2px 12px rgba(108,99,255,0.15);
+  }
+  .country-card:active { cursor: grabbing; }
+  .country-card .flag { font-size: 1.5rem; flex-shrink: 0; line-height: 1; }
+  .country-card .name { font-weight: 500; font-size: 0.92rem; }
+  .country-card .rank-num {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .pool-list .country-card { background: rgba(28,33,84,0.6); }
+
+  .rank-list.user-rank .country-card {
+    background: linear-gradient(135deg, var(--esc-surface) 0%, rgba(108,99,255,0.08) 100%);
+    border-color: rgba(108,99,255,0.25);
+  }
+  .rank-list.user-rank .country-card .rank-num { background: var(--esc-glow); color: #fff; }
+  .rank-list.user-rank .country-card:nth-child(1) .rank-num { background: linear-gradient(135deg, #D4AF37, #F5D060); color: #1a1000; }
+  .rank-list.user-rank .country-card:nth-child(2) .rank-num { background: linear-gradient(135deg, #A0A0A8, #D0D0D8); color: #222; }
+  .rank-list.user-rank .country-card:nth-child(3) .rank-num { background: linear-gradient(135deg, #CD7F32, #E8A050); color: #1a1000; }
+
+  .rank-list.admin-rank .country-card {
+    background: linear-gradient(135deg, var(--esc-surface) 0%, rgba(212,175,55,0.06) 100%);
+    border-color: rgba(212,175,55,0.2);
+  }
+  .rank-list.admin-rank .country-card .rank-num { background: rgba(212,175,55,0.25); color: var(--esc-gold); }
+  .rank-list.admin-rank .country-card:nth-child(1) .rank-num { background: linear-gradient(135deg, #D4AF37, #F5D060); color: #1a1000; }
+  .rank-list.admin-rank .country-card:nth-child(2) .rank-num { background: linear-gradient(135deg, #A0A0A8, #D0D0D8); color: #222; }
+  .rank-list.admin-rank .country-card:nth-child(3) .rank-num { background: linear-gradient(135deg, #CD7F32, #E8A050); color: #1a1000; }
+
+  .empty-state {
+    border: 2px dashed rgba(108,99,255,0.2);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    color: rgba(232,230,240,0.35);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    pointer-events: none;
+  }
+
+  .tab-btn {
+    padding: 10px 24px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(28,33,84,0.4);
+    color: rgba(232,230,240,0.5);
+  }
+  .tab-btn.active {
+    background: var(--esc-surface);
+    color: #fff;
+    border-color: rgba(108,99,255,0.3);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--esc-glow), #8B5CF6);
+    color: #fff;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: transform 0.15s, box-shadow 0.2s;
+    font-family: 'Outfit', sans-serif;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,99,255,0.4); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-gold {
+    background: linear-gradient(135deg, var(--esc-gold), #F5D060);
+    color: #1a1000;
+    font-weight: 700;
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: transform 0.15s, box-shadow 0.2s;
+    font-family: 'Outfit', sans-serif;
+  }
+  .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(212,175,55,0.4); }
+  .btn-gold:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-secondary {
+    background: rgba(108,99,255,0.12);
+    color: var(--esc-glow);
+    font-weight: 600;
+    padding: 10px 22px;
+    border-radius: 10px;
+    border: 1px solid rgba(108,99,255,0.25);
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+    font-family: 'Outfit', sans-serif;
+  }
+  .btn-secondary:hover { background: rgba(108,99,255,0.2); }
+
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: #fff;
+    padding: 14px 32px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    box-shadow: 0 8px 32px rgba(16,185,129,0.3);
+    z-index: 9999;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .lb-row {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    transition: background 0.2s;
+  }
+  .lb-row:nth-child(1) { background: linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.05)); border: 1px solid rgba(212,175,55,0.3); }
+  .lb-row:nth-child(2) { background: linear-gradient(135deg, rgba(160,160,168,0.12), rgba(160,160,168,0.04)); border: 1px solid rgba(160,160,168,0.2); }
+  .lb-row:nth-child(3) { background: linear-gradient(135deg, rgba(205,127,50,0.12), rgba(205,127,50,0.04)); border: 1px solid rgba(205,127,50,0.2); }
+  .lb-row:nth-child(n+4) { background: rgba(28,33,84,0.4); border: 1px solid rgba(108,99,255,0.1); }
+
+  .lb-medal {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 1.1rem;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+  }
+  .lb-row:nth-child(1) .lb-medal { background: linear-gradient(135deg,#D4AF37,#F5D060); color:#1a1000; }
+  .lb-row:nth-child(2) .lb-medal { background: linear-gradient(135deg,#A0A0A8,#D0D0D8); color:#222; }
+  .lb-row:nth-child(3) .lb-medal { background: linear-gradient(135deg,#CD7F32,#E8A050); color:#1a1000; }
+  .lb-row:nth-child(n+4) .lb-medal { background: rgba(108,99,255,0.15); color: var(--esc-glow); }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.3); border-radius: 3px; }
+
+  .admin-textarea {
+    width: 100%;
+    min-height: 140px;
+    background: rgba(11,14,45,0.8);
+    border: 1px solid rgba(108,99,255,0.2);
+    border-radius: 10px;
+    padding: 14px;
+    color: #E8E6F0;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .admin-textarea:focus { border-color: var(--esc-glow); }
+
+  .section-divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,175,55,0.3), transparent);
+    margin: 32px 0;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .status-badge.ready { background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.3); }
+  .status-badge.pending { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); }
+
+  @media (max-width: 768px) {
+    .two-col { flex-direction: column !important; }
+    .col-half { width: 100% !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app-wrap">
+  <!-- Header -->
+  <header class="text-center pt-8 pb-4 px-4">
+    <div class="inline-block mb-3">
+      <span class="text-4xl">✨🎤🇪🇺🎶✨</span>
+    </div>
+    <h1 class="text-3xl md:text-4xl font-black tracking-tight mb-1" style="background: linear-gradient(135deg, var(--esc-gold), var(--esc-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+      Eurovision 2026
+    </h1>
+    <p class="text-base font-light tracking-wide mb-1" style="color: rgba(232,230,240,0.6);">Vienna — Grand Final Prediction Game</p>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="flex justify-center gap-1 px-4 mb-0">
+    <button class="tab-btn active" onclick="switchTab('predict')">🗳️ My Prediction</button>
+    <button class="tab-btn" onclick="switchTab('admin')">🔧 Admin</button>
+  </nav>
+
+  <!-- ===== PREDICT TAB ===== -->
+  <div id="tab-predict" class="tab-panel active max-w-5xl mx-auto px-4 pb-10">
+    <div class="rounded-b-xl p-4 mb-6" style="background: var(--esc-surface); border: 1px solid rgba(108,99,255,0.15); border-top: 3px solid var(--esc-glow);">
+      <p class="text-sm leading-relaxed" style="color: rgba(232,230,240,0.75);">
+        <strong class="text-white">How to play:</strong>
+        Drag countries from the <strong style="color:var(--esc-cyan);">Unranked Pool</strong> on the left into your
+        <strong style="color:var(--esc-pink);">Official Ranking</strong> on the right. Reorder within the ranking to set your 1st → 25th predictions. Your progress is saved automatically.
+        When all 25 are ranked, hit <strong style="color:var(--esc-lime);">Export</strong> to copy your prediction string.
+      </p>
+    </div>
+
+    <div class="two-col flex gap-5" style="align-items: flex-start;">
+      <div class="col-half" style="width:42%; flex-shrink:0;">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold tracking-wide" style="color: var(--esc-cyan);">
+            Unranked Pool <span id="pool-count" class="font-normal text-sm" style="color:rgba(232,230,240,0.45);"></span>
+          </h2>
+        </div>
+        <div id="pool" class="pool-list flex flex-col gap-2 min-h-[80px] rounded-xl p-3" style="background: rgba(11,14,45,0.4); border: 1px solid rgba(0,212,255,0.1);"></div>
+      </div>
+      <div class="col-half" style="width:58%; flex-shrink:0;">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold tracking-wide" style="color: var(--esc-pink);">
+            My Official Ranking <span id="rank-count" class="font-normal text-sm" style="color:rgba(232,230,240,0.45);"></span>
+          </h2>
+          <button class="btn-secondary text-xs" onclick="resetUser()" title="Move all back to pool">↩ Reset</button>
+        </div>
+        <div id="ranking" class="rank-list user-rank flex flex-col gap-2 min-h-[80px] rounded-xl p-3" style="background: rgba(11,14,45,0.4); border: 1px solid rgba(255,107,157,0.1);"></div>
+        <div id="ranking-empty" class="empty-state mt-1">
+          ↑ Drag countries here to build your ranking<br>
+          <span class="text-xs">1st place at the top, 25th at the bottom</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col items-center mt-8 gap-3">
+      <button id="export-btn" class="btn-primary text-base" onclick="exportRanking()" disabled>
+        📋 Export My Ranking
+      </button>
+      <p id="export-hint" class="text-xs" style="color:rgba(232,230,240,0.4);">Rank all 25 countries to enable export</p>
+    </div>
+  </div>
+
+  <!-- ===== ADMIN TAB ===== -->
+  <div id="tab-admin" class="tab-panel max-w-5xl mx-auto px-4 pb-10">
+    <div class="rounded-b-xl p-4 mb-6" style="background: var(--esc-surface); border: 1px solid rgba(212,175,55,0.15); border-top: 3px solid var(--esc-gold);">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+        <h2 class="text-lg font-bold" style="color: var(--esc-gold);">🏆 Set Actual Results</h2>
+        <span id="admin-status" class="status-badge pending">⏳ Incomplete</span>
+      </div>
+      <p class="text-sm" style="color:rgba(232,230,240,0.55);">
+        Drag countries from the pool into the <strong style="color:var(--esc-gold);">Actual Finishing Order</strong> — 1st place winner at the top, last place at the bottom. Saved automatically.
+      </p>
+    </div>
+
+    <div class="two-col flex gap-5 mb-2" style="align-items: flex-start;">
+      <div class="col-half" style="width:42%; flex-shrink:0;">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold tracking-wide" style="color: var(--esc-cyan);">
+            Unranked <span id="admin-pool-count" class="font-normal text-sm" style="color:rgba(232,230,240,0.45);"></span>
+          </h2>
+        </div>
+        <div id="admin-pool" class="pool-list flex flex-col gap-2 min-h-[80px] rounded-xl p-3" style="background: rgba(11,14,45,0.4); border: 1px solid rgba(0,212,255,0.1);"></div>
+      </div>
+      <div class="col-half" style="width:58%; flex-shrink:0;">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold tracking-wide" style="color: var(--esc-gold);">
+            Actual Finishing Order <span id="admin-rank-count" class="font-normal text-sm" style="color:rgba(232,230,240,0.45);"></span>
+          </h2>
+          <button class="btn-secondary text-xs" onclick="resetAdmin()" title="Move all back to pool">↩ Reset</button>
+        </div>
+        <div id="admin-ranking" class="rank-list admin-rank flex flex-col gap-2 min-h-[80px] rounded-xl p-3" style="background: rgba(11,14,45,0.4); border: 1px solid rgba(212,175,55,0.1);"></div>
+        <div id="admin-ranking-empty" class="empty-state mt-1">
+          ↑ Drag the winner here first, then 2nd, 3rd…<br>
+          <span class="text-xs">Complete all 25 to unlock the leaderboard</span>
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <div class="rounded-xl p-5 mb-6" style="background: var(--esc-surface); border: 1px solid rgba(108,99,255,0.15);">
+      <h2 class="text-lg font-bold mb-4" style="color: var(--esc-cyan);">📥 Paste Predictions</h2>
+      <p class="text-sm mb-3" style="color:rgba(232,230,240,0.6);">Paste one prediction per line as <code class="px-1 py-0.5 rounded text-xs" style="background:rgba(108,99,255,0.15);">Name: &lt;exported string&gt;</code></p>
+      <textarea id="admin-predictions" class="admin-textarea" style="min-height:200px;" placeholder="Alice: eyJyIjpbIkZyYW5jZSIsIl...&#10;Bob: eyJyIjpbIkl0YWx5IiwiR...&#10;Carol: eyJyIjpbIlN3ZWRlbiIs..."></textarea>
+      <button id="generate-btn" class="btn-gold mt-3 text-sm" onclick="generateLeaderboard()" disabled>📊 Generate Leaderboard</button>
+      <p id="pred-status" class="text-xs mt-2" style="color:rgba(232,230,240,0.4);"></p>
+    </div>
+
+    <div id="leaderboard-wrap" style="display:none;">
+      <h2 class="text-xl font-bold mb-4 text-center" style="color: var(--esc-gold);">🏆 Leaderboard</h2>
+      <div id="leaderboard"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Copied to clipboard!</div>
+</div>
+
+<script>
+const COUNTRIES = [
+  { id:'albania',   name:'Albania',        flag:'🇦🇱' },
+  { id:'australia',  name:'Australia',      flag:'🇦🇺' },
+  { id:'austria',    name:'Austria',        flag:'🇦🇹' },
+  { id:'belgium',    name:'Belgium',        flag:'🇧🇪' },
+  { id:'bulgaria',   name:'Bulgaria',       flag:'🇧🇬' },
+  { id:'croatia',    name:'Croatia',        flag:'🇭🇷' },
+  { id:'cyprus',     name:'Cyprus',         flag:'🇨🇾' },
+  { id:'czechia',    name:'Czechia',        flag:'🇨🇿' },
+  { id:'denmark',    name:'Denmark',        flag:'🇩🇰' },
+  { id:'finland',    name:'Finland',        flag:'🇫🇮' },
+  { id:'france',     name:'France',         flag:'🇫🇷' },
+  { id:'germany',    name:'Germany',        flag:'🇩🇪' },
+  { id:'greece',     name:'Greece',         flag:'🇬🇷' },
+  { id:'israel',     name:'Israel',         flag:'🇮🇱' },
+  { id:'italy',      name:'Italy',          flag:'🇮🇹' },
+  { id:'lithuania',  name:'Lithuania',      flag:'🇱🇹' },
+  { id:'malta',      name:'Malta',          flag:'🇲🇹' },
+  { id:'moldova',    name:'Moldova',        flag:'🇲🇩' },
+  { id:'norway',     name:'Norway',         flag:'🇳🇴' },
+  { id:'poland',     name:'Poland',         flag:'🇵🇱' },
+  { id:'romania',    name:'Romania',        flag:'🇷🇴' },
+  { id:'serbia',     name:'Serbia',         flag:'🇷🇸' },
+  { id:'sweden',     name:'Sweden',         flag:'🇸🇪' },
+  { id:'ukraine',    name:'Ukraine',        flag:'🇺🇦' },
+  { id:'uk',         name:'United Kingdom', flag:'🇬🇧' },
+];
+const TOTAL = COUNTRIES.length;
+const countryMap = Object.fromEntries(COUNTRIES.map(c => [c.id, c]));
+
+let poolIds = [], rankIds = [];
+let adminPoolIds = [], adminRankIds = [];
+
+function restoreList(key, fallbackAll) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+    if (saved && saved.pool && saved.rank) {
+      const allIds = new Set(COUNTRIES.map(c => c.id));
+      const sp = saved.pool.filter(id => allIds.has(id));
+      const sr = saved.rank.filter(id => allIds.has(id));
+      const used = new Set([...sp, ...sr]);
+      const missing = COUNTRIES.filter(c => !used.has(c.id)).map(c => c.id);
+      return { pool: [...sp, ...missing], rank: sr };
+    }
+  } catch(e) {}
+  return { pool: COUNTRIES.map(c => c.id), rank: [] };
+}
+
+function loadState() {
+  const u = restoreList('esc2026_state');
+  poolIds = u.pool; rankIds = u.rank;
+  const a = restoreList('esc2026_admin');
+  adminPoolIds = a.pool; adminRankIds = a.rank;
+}
+
+function saveUserState() { localStorage.setItem('esc2026_state', JSON.stringify({ pool: poolIds, rank: rankIds })); }
+function saveAdminState() { localStorage.setItem('esc2026_admin', JSON.stringify({ pool: adminPoolIds, rank: adminRankIds })); }
+
+function makeCard(id, showRank, rankNum) {
+  const c = countryMap[id];
+  const div = document.createElement('div');
+  div.className = 'country-card';
+  div.dataset.id = id;
+  let inner = '';
+  if (showRank) inner += `<span class="rank-num">${rankNum}</span>`;
+  inner += `<span class="flag">${c.flag}</span><span class="name">${c.name}</span>`;
+  div.innerHTML = inner;
+  return div;
+}
+
+function renderUser() {
+  const poolEl = document.getElementById('pool');
+  const rankEl = document.getElementById('ranking');
+  poolEl.innerHTML = ''; rankEl.innerHTML = '';
+  poolIds.forEach(id => poolEl.appendChild(makeCard(id, false)));
+  rankIds.forEach((id, i) => rankEl.appendChild(makeCard(id, true, i + 1)));
+  document.getElementById('pool-count').textContent = `(${poolIds.length})`;
+  document.getElementById('rank-count').textContent = `(${rankIds.length}/${TOTAL})`;
+  document.getElementById('ranking-empty').style.display = rankIds.length === 0 ? 'block' : 'none';
+  const btn = document.getElementById('export-btn');
+  const hint = document.getElementById('export-hint');
+  if (rankIds.length === TOTAL) {
+    btn.disabled = false;
+    hint.textContent = 'All countries ranked — ready to export!';
+    hint.style.color = '#10B981';
+  } else {
+    btn.disabled = true;
+    hint.textContent = `Rank all ${TOTAL} countries to enable export (${TOTAL - rankIds.length} remaining)`;
+    hint.style.color = 'rgba(232,230,240,0.4)';
+  }
+  saveUserState();
+}
+
+function renderAdmin() {
+  const poolEl = document.getElementById('admin-pool');
+  const rankEl = document.getElementById('admin-ranking');
+  poolEl.innerHTML = ''; rankEl.innerHTML = '';
+  adminPoolIds.forEach(id => poolEl.appendChild(makeCard(id, false)));
+  adminRankIds.forEach((id, i) => rankEl.appendChild(makeCard(id, true, i + 1)));
+  document.getElementById('admin-pool-count').textContent = `(${adminPoolIds.length})`;
+  document.getElementById('admin-rank-count').textContent = `(${adminRankIds.length}/${TOTAL})`;
+  document.getElementById('admin-ranking-empty').style.display = adminRankIds.length === 0 ? 'block' : 'none';
+  const badge = document.getElementById('admin-status');
+  const genBtn = document.getElementById('generate-btn');
+  if (adminRankIds.length === TOTAL) {
+    badge.className = 'status-badge ready';
+    badge.innerHTML = '✓ All 25 results set';
+    genBtn.disabled = false;
+  } else {
+    badge.className = 'status-badge pending';
+    badge.innerHTML = `⏳ ${TOTAL - adminRankIds.length} remaining`;
+    genBtn.disabled = true;
+  }
+  saveAdminState();
+}
+
+function initSortable() {
+  const opts = {
+    animation: 200,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    delay: 50,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 3,
+    fallbackTolerance: 3,
+  };
+  Sortable.create(document.getElementById('pool'),    { ...opts, group: 'user', onEnd: syncUser });
+  Sortable.create(document.getElementById('ranking'),  { ...opts, group: 'user', onEnd: syncUser });
+  Sortable.create(document.getElementById('admin-pool'),    { ...opts, group: 'admin', onEnd: syncAdmin });
+  Sortable.create(document.getElementById('admin-ranking'),  { ...opts, group: 'admin', onEnd: syncAdmin });
+}
+
+function syncUser() {
+  poolIds = [...document.getElementById('pool').children].map(el => el.dataset.id);
+  rankIds = [...document.getElementById('ranking').children].map(el => el.dataset.id);
+  renderUser();
+}
+function syncAdmin() {
+  adminPoolIds = [...document.getElementById('admin-pool').children].map(el => el.dataset.id);
+  adminRankIds = [...document.getElementById('admin-ranking').children].map(el => el.dataset.id);
+  renderAdmin();
+}
+
+function exportRanking() {
+  if (rankIds.length !== TOTAL) return;
+  const names = rankIds.map(id => countryMap[id].name);
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ r: names }))));
+  navigator.clipboard.writeText(payload).then(() => showToast('Copied to clipboard!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = payload; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('Copied to clipboard!');
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function resetUser() {
+  if (!confirm('Move all countries back to the unranked pool?')) return;
+  poolIds = COUNTRIES.map(c => c.id); rankIds = [];
+  renderUser();
+}
+function resetAdmin() {
+  if (!confirm('Reset the actual results order?')) return;
+  adminPoolIds = COUNTRIES.map(c => c.id); adminRankIds = [];
+  renderAdmin();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (tab === 'predict' && i === 0) || (tab === 'admin' && i === 1));
+  });
+  document.getElementById('tab-predict').classList.toggle('active', tab === 'predict');
+  document.getElementById('tab-admin').classList.toggle('active', tab === 'admin');
+}
+
+function generateLeaderboard() {
+  const status = document.getElementById('pred-status');
+  if (adminRankIds.length !== TOTAL) {
+    status.innerHTML = '<span style="color:#EF4444;">Drag all 25 countries into the finishing order first.</span>';
+    return;
+  }
+  const actualResults = adminRankIds.map(id => countryMap[id].name);
+  const raw = document.getElementById('admin-predictions').value.trim();
+  if (!raw) { status.innerHTML = '<span style="color:#EF4444;">Paste at least one prediction.</span>'; return; }
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const entries = [], parseErrors = [];
+  lines.forEach((line, idx) => {
+    const ci = line.indexOf(':');
+    if (ci === -1) { parseErrors.push(`Line ${idx+1}: missing "Name: string" format`); return; }
+    const name = line.slice(0, ci).trim();
+    const b64 = line.slice(ci + 1).trim();
+    try {
+      const json = JSON.parse(decodeURIComponent(escape(atob(b64))));
+      if (!json.r || !Array.isArray(json.r)) throw 0;
+      entries.push({ name, ranking: json.r });
+    } catch(e) { parseErrors.push(`Line ${idx+1} ("${name}"): couldn't decode`); }
+  });
+  if (parseErrors.length) status.innerHTML = `<span style="color:#F59E0B;">Warnings:<br>${parseErrors.join('<br>')}</span>`;
+  else status.innerHTML = `<span style="color:#10B981;">✓ Parsed ${entries.length} prediction${entries.length !== 1 ? 's' : ''}</span>`;
+  if (!entries.length) return;
+
+  const actualRankMap = {};
+  actualResults.forEach((n, i) => actualRankMap[n] = i + 1);
+
+  const scored = entries.map(entry => {
+    let total = 0, matched = 0, bestDiff = Infinity, bestCountry = '', worstDiff = 0, worstCountry = '';
+    entry.ranking.forEach((country, pi) => {
+      const ar = actualRankMap[country];
+      if (ar === undefined) return;
+      matched++;
+      const diff = Math.abs(pi + 1 - ar);
+      total += diff;
+      if (diff < bestDiff) { bestDiff = diff; bestCountry = country; }
+      if (diff > worstDiff) { worstDiff = diff; worstCountry = country; }
+    });
+    const unmatched = TOTAL - matched;
+    total += unmatched * TOTAL;
+    return { name: entry.name, total, matched, unmatched, bestCountry, bestDiff, worstCountry, worstDiff };
+  }).sort((a, b) => a.total - b.total);
+
+  const unmatchedWarnings = scored.filter(s => s.unmatched > 0).map(s => `${s.name}: ${s.unmatched} country name(s) didn't match (+${s.unmatched * TOTAL} penalty)`);
+  if (parseErrors.length || unmatchedWarnings.length) {
+    const parts = [];
+    if (parseErrors.length) parts.push(...parseErrors);
+    if (unmatchedWarnings.length) parts.push(...unmatchedWarnings);
+    status.innerHTML = `<span style="color:#F59E0B;">Warnings:<br>${parts.join('<br>')}</span>`;
+  } else {
+    status.innerHTML = `<span style="color:#10B981;">✓ All ${entries.length} prediction${entries.length !== 1 ? 's' : ''} matched perfectly</span>`;
+  }
+
+  const wrap = document.getElementById('leaderboard-wrap');
+  const lb = document.getElementById('leaderboard');
+  wrap.style.display = 'block'; lb.innerHTML = '';
+
+  scored.forEach((s, i) => {
+    const c1 = COUNTRIES.find(c => c.name === s.bestCountry);
+    const c2 = COUNTRIES.find(c => c.name === s.worstCountry);
+    const row = document.createElement('div');
+    row.className = 'lb-row';
+    row.innerHTML = `
+      <span class="lb-medal">${i + 1}</span>
+      <div>
+        <div class="font-bold text-base">${s.name}${s.unmatched ? ' <span style="color:#F59E0B; font-size:0.75rem; font-weight:600;">⚠ ' + s.unmatched + ' unmatched (+' + (s.unmatched * TOTAL) + ' penalty)</span>' : ''}</div>
+        <div class="text-xs mt-1" style="color:rgba(232,230,240,0.55);">
+          <span style="color:#10B981;">Best:</span> ${c1?c1.flag:''} ${s.bestCountry} <span style="color:rgba(232,230,240,0.3);">(${s.bestDiff===0?'perfect!':s.bestDiff+' off'})</span>
+          &nbsp;·&nbsp;
+          <span style="color:#EF4444;">Worst:</span> ${c2?c2.flag:''} ${s.worstCountry} <span style="color:rgba(232,230,240,0.3);">(${s.worstDiff} off)</span>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="font-bold text-lg" style="font-family:'Space Mono',monospace; color:${i===0?'var(--esc-gold)':'#E8E6F0'};">${s.total}</div>
+        <div class="text-xs" style="color:rgba(232,230,240,0.4);">pts off</div>
+      </div>`;
+    lb.appendChild(row);
+  });
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+loadState();
+renderUser();
+renderAdmin();
+initSortable();
+</script>
+</body>
+</html>
